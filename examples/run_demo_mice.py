@@ -40,7 +40,7 @@ X, y = load_mice()
 
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 
-model = LassoNetClassifier(eps=1e-3, n_lambdas=1000)
+model = LassoNetClassifier(eps_start=1e-3, lambda_start=0.1)
 path = model.path(X_train, y_train)
 
 n_selected = []

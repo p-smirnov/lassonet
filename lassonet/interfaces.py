@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod, abstractstaticmethod
 from dataclasses import dataclass
 from functools import partial
 from typing import List
+from warnings import warn
 
 import numpy as np
 from sklearn.base import (
@@ -60,7 +61,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             loss of the unconstrained model multiplied by eps_start.
         lambda_start : float, default=None
             First value on the path.
-        path_multiplier : float or None
+        path_multiplier : float
             Multiplicative factor (:math:`1 + \\epsilon`) to increase
             the penalty parameter over the path
         M : float, default=10.0
@@ -214,17 +215,30 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
     def _lambda_max(X, y):
         raise NotImplementedError
 
-    def path(self, X, y, lambda_=None) -> List[HistoryItem]:
+    def path(self, X_train, y_train, X_val=None, y_val=None, lambda_=None) -> List[HistoryItem]:
         """Train LassoNet on a lambda_ path.
         The path is defined by the class parameters:
         start at `eps * lambda_max` and increment according
         to `path_multiplier` or `n_lambdas`.
         The path will stop when no feature is being used anymore.
 
+
+        'X_val' and 'y_val' are optional parameters allowing a
+        validation set to be passed in. If omitted, a validation
+        set will be randomly created by reserving 'model.val_size'
+        proportion of the training data.
+
         The optional `lambda_` argument will also stop the path when
         this value is reached.
         """
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=self.val_size)
+        if(X_val is None or y_val is None):
+            if(y_val is not None):
+                warn("y_val passed in without passing in X_val. Ignoring y_val.")
+            if(X_val is not None):
+                warn("X_val passed in without passing in y_val. Ignoring X_val.")
+            X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=self.val_size)
+
+
         X_train, y_train = self._cast_input(X_train, y_train)
         X_val, y_val = self._cast_input(X_val, y_val)
 
@@ -378,8 +392,9 @@ class LassoNetClassifier(
     """Use LassoNet as classifier"""
 
     def _convert_y(self, y) -> torch.TensorType:
+        y = torch.LongTensor(y).to(self.device)
         assert len(y.shape) == 1, "y must be 1D"
-        return torch.LongTensor(y).to(self.device)
+        return y
 
     @staticmethod
     def _output_shape(y):
@@ -427,7 +442,7 @@ def lassonet_path(X, y, task, **kwargs):
         loss of the unconstrained model multiplied by eps_start.
     lambda_start : float, default=None
         First value on the path.
-    path_multiplier : float or None
+    path_multiplier : float
         Multiplicative factor (:math:`1 + \\epsilon`) to increase
         the penalty parameter over the path
     M : float, default=10.0

@@ -50,6 +50,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         verbose=0,
         random_state=None,
         torch_seed=None,
+        lr=1e-3,
     ):
         """
         Parameters
@@ -95,8 +96,8 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.M = M
         if optim is None:
             optim = (
-                partial(torch.optim.Adam, lr=1e-3),
-                partial(torch.optim.SGD, lr=1e-3, momentum=0.9),
+                partial(torch.optim.Adam, lr=lr),
+                partial(torch.optim.SGD, lr=lr, momentum=0.9),
             )
         if isinstance(optim, torch.optim.Optimizer):
             optim = (optim, optim)

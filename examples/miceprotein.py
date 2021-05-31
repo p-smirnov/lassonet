@@ -18,7 +18,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-
+import lassonet
 from lassonet import LassoNetClassifier, plot_path
 
 X, y = fetch_openml(name="miceprotein", return_X_y=True)
@@ -33,7 +33,7 @@ X = StandardScaler().fit_transform(X)
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 
 model = LassoNetClassifier(verbose=True)
-path = model.path(X_train, y_train)
+path = model.path(X_train, y_train, X_val=X_test, y_val=y_test)
 
 
 plot_path(model, path, X_test, y_test)

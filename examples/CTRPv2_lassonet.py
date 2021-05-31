@@ -14,10 +14,12 @@ This dataset consists of protein expression levels measured in the cortex of nor
 
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
+from sklearn.model_selection import KFold
 import matplotlib
 # matplotlib.use('Agg')
 
@@ -29,14 +31,23 @@ from lassonet.utils import plot_path
 
 import pandas as pd
 
+## Define some optimization paramaters
+
+n_outer_folds = 5
+n_inner_folds = 5
+
+nHiddenUnits = [10,20,50,100,200,500]
+nLayers = [1,2,3]
+
+
 
 
 def load_ctrp(drug="Lapatinib"):
-	gene_exp = pd.read_csv("ctrpv2.gene.exp.l1k.csv")
+	gene_exp = pd.read_csv("../data/ctrpv2.gene.exp.l1k.csv")
 	gene_exp = gene_exp.dropna(1)
 	gene_exp.index = gene_exp.iloc[:,0]
 	gene_exp = gene_exp.drop('Unnamed: 0', axis=1)
-	drug_resp = pd.read_csv("ctrpv2.aac.csv")
+	drug_resp = pd.read_csv("../data/ctrpv2.aac.csv")
 	drug_resp.index = drug_resp.iloc[:,0]
 	drug_resp = drug_resp.drop('Unnamed: 0', axis=1)
 	drug_resp = drug_resp.loc[drug]
@@ -44,17 +55,25 @@ def load_ctrp(drug="Lapatinib"):
 	unique_cells = gene_exp.columns.intersection(drug_resp.index)
 	drug_resp = drug_resp[unique_cells].to_numpy()
 	gene_exp = gene_exp[unique_cells].transpose().to_numpy()
-	gene_exp = MinMaxScaler(feature_range=(0, 1)).fit_transform(gene_exp)
+	gene_exp = StandardScaler().fit_transform(gene_exp)  ## TODO: move this into CV loop
 	return(gene_exp, drug_resp)
 
 
 X, y = load_ctrp()
+kf_outer = KFold(n_outer_folds)
+kf_inner = KFold(n_inner_folds)
 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y/100)
+for train_index, test_index in kf.split(X):
+	train_X, train_y = X[train_index,], y[train_index]
+	test_X, test_y = X[test_index,], y[test_index]
+	for train_index, valid_index in kf.split(X):
+		train_X, train_y = train_X[train_index,], train_y[train_index]
+		valid_X, valid_y = train_X[valid_index,], train_y[valid_index]
+		model = LassoNetRegressor(eps_start=1e-2, lambda_start=1, n_iters=(5000,5000), hidden_dims=(100,), path_multiplier=1.005)
+		path = model.path(X_train, y_train)
 
-model = LassoNetRegressor(eps_start=1e-3, lambda_start=1, n_iters=(1000,10), hidden_dims=(10,), path_multiplier=1.05)
-path = model.path(X_train, y_train, [0.1])
+
 
 n_selected = []
 accuracy = []

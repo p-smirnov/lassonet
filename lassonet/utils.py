@@ -47,4 +47,7 @@ def plot_path(model, path, X_test, y_test):
     plt.xlabel("lambda")
     plt.xscale("log")
     plt.ylabel("number of selected features")
+    plt.tight_layout()
     return plt
+
+

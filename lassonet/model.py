@@ -44,7 +44,7 @@ class LassoNet(nn.Module):
 
     def input_mask(self):
         with torch.no_grad():
-            return torch.norm(self.skip.weight.data, p=2, dim=0) != 0
+            return torch.norm(self.skip.weight.data, p=2, dim=0).cpu() != 0
 
     def selected_count(self):
         return self.input_mask().sum().item()

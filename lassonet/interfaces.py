@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import List
 from warnings import warn
+from copy import copy
 
 import numpy as np
 from sklearn.base import (
@@ -13,7 +14,9 @@ from sklearn.base import (
     RegressorMixin,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
 import torch
+from scipy.stats import pearsonr, spearmanr
 
 from .model import LassoNet
 
@@ -30,27 +33,29 @@ class HistoryItem:
     regularization: float
     selected: torch.BoolTensor
     n_iters: int
+    train_loss: float
+    validation_metrics: tuple
 
 
 class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
     def __init__(
-        self,
-        *,
-        hidden_dims=(100,),
-        eps_start=1,
-        lambda_start=None,
-        path_multiplier=1.02,
-        M=10,
-        optim=None,
-        n_iters=(1000, 100),
-        patience=(100, 10),
-        tol=0.99,
-        val_size=0.1,
-        device=None,
-        verbose=0,
-        random_state=None,
-        torch_seed=None,
-        lr=1e-3,
+            self,
+            *,
+            hidden_dims=(100,),
+            eps_start=1,
+            lambda_start=None,
+            path_multiplier=1.02,
+            M=10,
+            optim=None,
+            n_iters=(1000, 100),
+            patience=(100, 10),
+            tol=0.99,
+            val_size=0.1,
+            device=None,
+            verbose=0,
+            random_state=None,
+            torch_seed=None,
+            lr=1e-3,
     ):
         """
         Parameters
@@ -161,16 +166,20 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.path(X, y)
         return self
 
+    @abstractmethod
+    def validation_metrics(self, X_val, y_val):
+        raise NotImplementedError
+
     def _train(
-        self,
-        X_train,
-        y_train,
-        X_val,
-        y_val,
-        epochs,
-        lambda_,
-        optimizer,
-        patience=None,
+            self,
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            epochs,
+            lambda_,
+            optimizer,
+            patience=None,
     ):
         model = self.model
 
@@ -178,8 +187,16 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             with torch.no_grad():
                 model.eval()
                 return (
-                    self.criterion(model(X_val), y_val).item()
-                    + lambda_ * model.regularization().item()
+                        self.criterion(model(X_val), y_val).item()
+                        + lambda_ * model.regularization().item()
+                )
+
+        def train_loss():
+            with torch.no_grad():
+                model.eval()
+                return (
+                        self.criterion(model(X_train), y_train).item()
+                        + lambda_ * model.regularization().item()
                 )
 
         best_obj = validation_loss()
@@ -206,7 +223,8 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 epochs_since_best_obj += 1
             if patience is not None and epochs_since_best_obj == patience:
                 break
-        return lambda_, epoch + 1, obj
+
+        return lambda_, epoch + 1, obj, train_loss(), self.validation_metrics(X_val, y_val)
 
     @abstractmethod
     def predict(self, X):
@@ -216,7 +234,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
     def _lambda_max(X, y):
         raise NotImplementedError
 
-    def path(self, X_train, y_train, X_val=None, y_val=None, lambda_=None) -> List[HistoryItem]:
+    def path(self, X_train, y_train, X_val=None, y_val=None, lambda_=None, lambda_path=None) -> List[HistoryItem]:
         """Train LassoNet on a lambda_ path.
         The path is defined by the class parameters:
         start at `eps * lambda_max` and increment according
@@ -232,20 +250,21 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         The optional `lambda_` argument will also stop the path when
         this value is reached.
         """
-        if(X_val is None or y_val is None):
-            if(y_val is not None):
+        if (X_val is None or y_val is None):
+            if (y_val is not None):
                 warn("y_val passed in without passing in X_val. Ignoring y_val.")
-            if(X_val is not None):
+            if (X_val is not None):
                 warn("X_val passed in without passing in y_val. Ignoring X_val.")
             X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=self.val_size)
-
+        if lambda_ is None:
+            lambda_ = float('inf')
 
         X_train, y_train = self._cast_input(X_train, y_train)
         X_val, y_val = self._cast_input(X_val, y_val)
 
         hist = []
 
-        def register(hist, lambda_, n_iters, val_loss):
+        def register(hist, lambda_, n_iters, val_loss, train_loss, validation_metrics):
             hist.append(
                 HistoryItem(
                     lambda_=lambda_,
@@ -254,6 +273,8 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                     regularization=self.model.regularization().item(),
                     selected=self.model.input_mask(),
                     n_iters=n_iters,
+                    train_loss=train_loss,
+                    validation_metrics=validation_metrics,
                 )
             )
 
@@ -286,7 +307,8 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             current_lambda = self.eps_start * hist[-1].val_loss
         optimizer = self.optim_path(self.model.parameters())
 
-        while self.model.selected_count() != 0:
+
+        def path_step(current_lambda):
             register(
                 hist,
                 *self._train(
@@ -301,6 +323,18 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 ),
             )
             last = hist[-1]
+            if len(hist) > 1:
+                prev = hist[-2]
+                # compute loss of previous solution at current lambda
+                prev_loss = prev.train_loss + (-prev.lambda_ + current_lambda) * prev.regularization
+                if prev_loss < last.train_loss:
+                    # use previous solution with lower loss for warm start
+                    self.model.load_state_dict(prev.state_dict)
+                    last = copy(prev)
+                    hist.pop()
+                    last.train_loss = prev_loss
+                    hist.append(last)
+
             if self.verbose:
                 print(
                     f"Lambda = {current_lambda:.2e}, "
@@ -313,7 +347,16 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                     f"regularization {last.regularization:.2e}"
                 )
 
-            current_lambda *= self.path_multiplier
+            return(current_lambda * self.path_multiplier)
+
+
+        if lambda_path is not None:
+            for current_lambda in lambda_path:
+                path_step(current_lambda)
+        else:
+            while self.model.selected_count() != 0 and current_lambda < lambda_:
+                current_lambda=path_step(current_lambda)
+
 
         self.feature_importances_ = self._compute_feature_importances(hist)
         """When does each feature disappear on the path?"""
@@ -385,6 +428,15 @@ class LassoNetRegressor(
             ans = ans.cpu().numpy()
         return ans
 
+    def validation_metrics(self, X_val, y_val):
+        with torch.no_grad():
+            self.model.eval()
+            preds = self.model(X_val).cpu().numpy()
+            y_val = y_val.cpu()
+            return (
+                (pearsonr(preds.reshape(-1), y_val.reshape(-1)), spearmanr(preds.reshape(-1), y_val.reshape(-1)), r2_score(preds, y_val))
+            )
+
 
 class LassoNetClassifier(
     ClassifierMixin,
@@ -424,6 +476,9 @@ class LassoNetClassifier(
         if isinstance(X, np.ndarray):
             ans = ans.cpu().numpy()
         return ans
+
+    def validation_metrics(self, X_val, y_val):
+        return ((None,))
 
 
 def lassonet_path(X, y, task, **kwargs):

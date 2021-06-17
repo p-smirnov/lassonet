@@ -25,7 +25,7 @@ import pandas as pd
 
 
 def load_mice():
-    df = pd.read_csv("Data_Cortex_Nuclear.csv")
+    df = pd.read_csv("/Work/Code/Github/lassonet_exp/lassonet/examples/Data_Cortex_Nuclear.csv")
     y = list(df[df.columns[78:81]].itertuples(False))
     classes = {lbl: i for i, lbl in enumerate(sorted(set(y)))}
     y = np.array([classes[lbl] for lbl in y])

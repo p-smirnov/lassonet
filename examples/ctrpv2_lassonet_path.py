@@ -38,11 +38,11 @@ parGrid = [(hiddenDims, lr) for hiddenDims, lr in parGrid if not (type(hiddenDim
 
 
 def load_ctrp(drug="Lapatinib"):
-    gene_exp = pd.read_csv("~/Code/Github/lassonet_exp/data/ctrpv2.gene.exp.l1k.csv")
+    gene_exp = pd.read_csv("examples/ctrpv2.gene.exp.l1k.csv")
     gene_exp = gene_exp.dropna(1)
     gene_exp.index = gene_exp.iloc[:,0]
     gene_exp = gene_exp.drop('Unnamed: 0', axis=1)
-    drug_resp = pd.read_csv("~/Code/Github/lassonet_exp/data/ctrpv2.aac.csv")
+    drug_resp = pd.read_csv("examples/ctrpv2.aac.csv")
     drug_resp.index = drug_resp.iloc[:,0]
     drug_resp = drug_resp.drop('Unnamed: 0', axis=1)
     drug_resp = drug_resp.loc[drug]
@@ -58,7 +58,7 @@ X, y = load_ctrp()
 kf_outer = KFold(n_outer_folds, shuffle=True, random_state=42)
 kf_inner = KFold(n_inner_folds, shuffle=True, random_state=5)
 
-FullModelResDict = pickle.load(open("/Work/Code/Github/lassonet_exp/lassonet/examples/fullModelHyperparameters.p", "rb"))
+FullModelResDict = pickle.load(open("examples/fullModelHyperparameters.p", "rb"))
 
 bestHyperpar = np.argmin([[np.mean(x) for x in y] for items,y in list(FullModelResDict.items())], axis=0)
 bestHyperpar = [list(FullModelResDict.keys())[i] for i in bestHyperpar]

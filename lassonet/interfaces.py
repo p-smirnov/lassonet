@@ -213,6 +213,13 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                     + lambda_ * model.regularization().item()
                 )
 
+        def train_loss():
+            with torch.no_grad():
+                model.eval()
+                return (
+                    self.criterion(model(X_train), y_train).item()
+                )
+        real_loss = train_loss()
         best_val_obj = validation_obj()
         epochs_since_best_val_obj = 0
         if self.backtrack:
@@ -249,6 +256,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                     model.prox(
                         lambda_=lambda_ * optimizer.param_groups[0]["lr"], M=self.M
                     )
+
 
             val_obj = validation_obj()
             if val_obj < self.tol * best_val_obj:

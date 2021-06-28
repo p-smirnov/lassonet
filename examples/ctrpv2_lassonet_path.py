@@ -89,7 +89,8 @@ for train_index, test_index, inner_loop_index in splitLists:
     pars=bestHyperpar[i]
     hiddenDims = tuple([x for x in pars[0] if type(x) is not tuple])
     lr = pars[1]
-    model = LassoNetRegressor(eps_start=1, n_iters=(5000,5000), hidden_dims=hiddenDims, path_multiplier=1.1, lr=lr)
+    model = LassoNetRegressor(eps_start=1, n_iters=(5000,5000), hidden_dims=hiddenDims,
+                              backtrack=True, batch_size=64, verbose=True, lr=lr, lambda_seq=np.logspace(-2,2,200))
     for train_index, valid_index in inner_loop_index:
         inner_train_X, inner_train_y = train_X[train_index,], train_y[train_index]
         valid_X, valid_y = train_X[valid_index,], train_y[valid_index]
@@ -99,7 +100,7 @@ for train_index, test_index, inner_loop_index in splitLists:
         # inner_train_y = scalerY.transform(inner_train_y.reshape(-1,1))
         valid_X = scalerX.transform(valid_X)
         # valid_y = scalerY.transform(valid_y.reshape(-1,1))
-        path = model.path(inner_train_X, inner_train_y.reshape(-1), X_val=valid_X, y_val=valid_y.reshape(-1), lambda_path=np.logspace(-2,2,200))
+        path = model.path(inner_train_X, inner_train_y.reshape(-1), X_val=valid_X, y_val=valid_y.reshape(-1))
         valid_path_inner.append(path)
         n_selected = []
         score = []
@@ -125,12 +126,12 @@ for train_index, test_index, inner_loop_index in splitLists:
     i += 1
 
 
-pearson_array = np.column_stack(pearson_outer)
-lambda_array = np.column_stack(lambda_outer)
-score_array = np.column_stack(score_outer)
-n_selected_array = np.column_stack(n_selected_outer)
-spearman_array = np.column_stack(spearman_outer)
-ii_array = np.column_stack(ii_list)
+pearson_array = np.concatenate(pearson_outer)
+lambda_array = np.concatenate(lambda_outer)
+score_array = np.concatenate(score_outer)
+n_selected_array = np.concatenate(n_selected_outer)
+spearman_array = np.concatenate(spearman_outer)
+ii_array = np.concatenate(ii_list)
 
 metricsDF = pd.DataFrame([pearson_array.flatten(), spearman_array.flatten(), score_array.flatten(), n_selected_array.flatten(), lambda_array.flatten(), ii_array.flatten()])
 

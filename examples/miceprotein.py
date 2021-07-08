@@ -32,10 +32,10 @@ X = StandardScaler().fit_transform(X)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 
-model = LassoNetClassifier(verbose=True, backtrack=True, batch_size=64)
+model = LassoNetClassifier(verbose=True, backtrack=False, backtrack_michal=True, batch_size=64)
 path = model.path(X_train, y_train, X_val=X_test, y_val=y_test)
 
 
 plot_path(model, path, X_test, y_test)
 
-plt.savefig("miceprotein_backtrack_batch_64.png")
+plt.savefig("miceprotein_backtrack_michal_batch_64.png")

@@ -29,7 +29,7 @@ def abstractattr(f):
 class HistoryItem:
     lambda_: float
     state_dict: dict
-    objective: float  # loss + lambda_ * regulatization
+    objective: float # loss + lambda_ * regulatization
     loss: float
     val_objective: float  # val_loss + lambda_ * regulatization
     val_loss: float
@@ -55,6 +55,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         patience=(100, 10),
         tol=0.99,
         backtrack=False,
+        backtrack_michal=False,
         val_size=0.1,
         device=None,
         verbose=0,
@@ -134,6 +135,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.patience = self.patience_init, self.patience_path = patience
         self.tol = tol
         self.backtrack = backtrack
+        self.backtrack_michal = backtrack_michal
         self.val_size = val_size
         self.device = device
         if device is None:
@@ -384,6 +386,18 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 )
             )
             last = hist[-1]
+            if len(hist) > 1 and self.backtrack_michal:
+                prev = hist[-2]
+                # compute loss of previous solution at current lambda
+                prev_loss = prev.loss + (-prev.lambda_ + current_lambda) * prev.regularization
+                if prev_loss < last.loss:
+                    # use previous solution with lower loss for warm start
+                    self.model.load_state_dict(prev.state_dict)
+                    last = copy(prev)
+                    hist.pop()
+                    last.loss = prev_loss
+                    hist.append(last)
+
             if self.verbose:
                 print(
                     f"Lambda = {current_lambda:.2e}, "

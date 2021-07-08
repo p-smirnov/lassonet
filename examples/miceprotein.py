@@ -38,4 +38,4 @@ path = model.path(X_train, y_train, X_val=X_test, y_val=y_test)
 
 plot_path(model, path, X_test, y_test)
 
-plt.savefig("miceprotein_backtrack_minibatches.png")
+plt.savefig("miceprotein_backtrack_batch_64.png")

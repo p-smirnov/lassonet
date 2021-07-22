@@ -207,8 +207,10 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         best_val_obj = validation_obj()
         epochs_since_best_val_obj = 0
         if self.backtrack:
-            best_state_dict = self.model.state_dict()
+            best_state_dict = self.model.cpu_state_dict()
             real_best_val_obj = best_val_obj
+            real_loss = float("nan")  # if epochs == 0
+
         n_iters = 0
 
         n_train = len(X_train)
@@ -241,6 +243,9 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                         lambda_=lambda_ * optimizer.param_groups[0]["lr"], M=self.M
                     )
 
+            if epoch == 0:
+                # fallback to running loss of first epoch
+                real_loss = loss
             val_obj = validation_obj()
             if val_obj < self.tol * best_val_obj:
                 best_val_obj = val_obj
@@ -248,7 +253,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             else:
                 epochs_since_best_val_obj += 1
             if self.backtrack and val_obj < real_best_val_obj:
-                best_state_dict = self.model.state_dict()
+                best_state_dict = self.model.cpu_state_dict()
                 real_best_val_obj = val_obj
                 real_loss = loss
                 n_iters = epoch + 1

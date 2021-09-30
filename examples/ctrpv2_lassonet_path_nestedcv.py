@@ -60,8 +60,9 @@ kf_inner = KFold(n_inner_folds, shuffle=True, random_state=5)
 
 FullModelResDict = pickle.load(open("examples/fullModelHyperparameters.p", "rb"))
 
-bestHyperpar = np.argmin([[np.mean(x) for x in y] for items,y in list(FullModelResDict.items())], axis=0)
-bestHyperpar = [list(FullModelResDict.keys())[i] for i in bestHyperpar]
+hyperparResTable = np.array([[np.mean(x) for x in y] for items,y in list(FullModelResDict.items())])
+bestHyperparTable = np.argmin(hyperparResTable, axis=0)
+bestHyperpar = [list(FullModelResDict.keys())[i] for i in bestHyperparTable]
 
 
 splitLists = []
@@ -133,7 +134,8 @@ n_selected_array = np.concatenate(n_selected_outer)
 spearman_array = np.concatenate(spearman_outer)
 ii_array = np.concatenate(ii_list)
 
-metricsDF = pd.DataFrame([pearson_array.flatten(), spearman_array.flatten(), score_array.flatten(), n_selected_array.flatten(), lambda_array.flatten(), ii_array.flatten()])
+metricsDF = pd.DataFrame([pearson_array.flatten(), spearman_array.flatten(), score_array.flatten(),
+                          n_selected_array.flatten(), lambda_array.flatten(), ii_array.flatten()])
 
 metricsDF = metricsDF.transpose()
 metricsDF.columns = ["Pearson", "Spearman", "Score", "N_Selected", "lambda", "loop"]

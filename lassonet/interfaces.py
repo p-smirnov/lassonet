@@ -118,6 +118,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.M = M
         self.batch_size = batch_size
         self.optim = optim
+        self.lr = lr
         if optim is None:
             optim = (
                 partial(torch.optim.Adam, lr=lr),
@@ -135,9 +136,9 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.tol = tol
         self.backtrack = backtrack
         self.val_size = val_size
-        self.device = device
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
         self.verbose = verbose
 
@@ -425,6 +426,26 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             current &= save.selected
         return ans
 
+    def _return_best_performance(self, path: List[HistoryItem]):
+        """At which lambda does the model perform best?
+
+        Parameters
+        ----------
+        path : List[HistoryItem]
+
+        Returns
+        -------
+            tuple of lambda, validation_loss, train_loss
+        """
+
+        first = path[0]
+        best_perf = (first.lambda_, first.val_loss, first.loss)
+        for save in islice(path, 1, None):
+            val_loss = save.val_loss
+            if(val_loss < best_perf[1]):
+                best_perf = (save.lambda_, save.val_loss, save.loss)
+        return best_perf
+
     def load(self, state_dict):
         if self.model is None:
             output_shape, input_shape = state_dict["skip.weight"].shape
@@ -473,6 +494,8 @@ class LassoNetRegressor(
             self.model.eval()
             preds = self.model(X_val).cpu().numpy()
             y_val = y_val.cpu()
+            # if(np.isnan(preds).any()):
+            #     print("Model predicting NaN. Something went wrong")
             return (
                 (pearsonr(preds.reshape(-1), y_val.reshape(-1)), spearmanr(preds.reshape(-1), y_val.reshape(-1)), r2_score(preds, y_val))
             )

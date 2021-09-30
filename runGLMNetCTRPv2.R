@@ -3,97 +3,163 @@ library(glmnet)
 
 source_python("pickleHelper.py")
 
-data <- read_pickle_file("save4R.p")
+
+drugNames=c("5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", "Dabrafenib", "Dasatinib", "Docetaxel", "Erlotinib", "Gefitinib", "Gemcitabine", "Ibrutinib", "JQ1 compound", "Lapatinib", "MK-2206", "Nilotinib", "Paclitaxel", "Pictilisib", "PLX4720", "Vincristine", "Vorinostat")
+drugNames=c("5-Fluorouracil", "Lapatinib")
 
 
 
-X <- data[[1]]
-y <- data[[2]]
+toPlotDrug <- list()
+lassonetDrug <- list()
+lassonetDrugSearchM <- list()
 
-splitIndicies <- data[[3]]
-ii <- 1
-dataList =list()
-topGeneCor <- numeric(25)
-
-for(i in seq_along(splitIndicies)){
-
-	train_outer_index <- splitIndicies[[i]][[1]]
-	test_index <- splitIndicies[[i]][[2]]
-	splitInner <- splitIndicies[[i]][[3]]
-
-	train_X <- X[train_outer_index,]
-	train_y <- y[train_outer_index]
-
-	test_X <- X[test_index,]
-	test_y <- y[test_index]
+for(drug in drugNames){
 
 
-	for(j in seq_along(splitInner)){
+	data <- read_pickle_file(paste0("examples/full_batch_backtrack/forR_",drug,".p"))
 
-		train_inner_index <- splitInner[[j]][[1]]
-		valid_index <- splitInner[[j]][[2]]
+
+
+	X <- data[[1]]
+	y <- data[[2]]
+
+	splitIndicies <- data[[3]]
+	ii <- 1
+	dataList =list()
+	topGeneCor <- numeric(length(splitIndicies))
+
+	for(i in seq_along(splitIndicies)){
+
+		train_outer_index <- splitIndicies[[i]][[1]]
+		valid_index <- splitIndicies[[i]][[2]]
+
+		train_X <- X[train_outer_index,]
+		train_y <- y[train_outer_index]
+
+		valid_X <- X[valid_index,]
+		valid_y <- y[valid_index]
+
+
 	
-		train_inner_X <- train_X[train_inner_index,]
-		train_inner_y <- train_y[train_inner_index]
-		valid_X <- train_X[valid_index,]
-		valid_y <- train_y[valid_index]
-
-		model = glmnet(train_inner_X, train_inner_y, nlambda=200, lambda.min.ratio=1e-7)		
+		model = glmnet(train_X, train_y, nlambda=200, lambda.min.ratio=1e-7)		
 		
-		top_gene <- which.max(cor(train_inner_X, train_inner_y))
+		top_gene <- which.max(abs(cor(train_X, train_y)))
 
 		predict_y = predict(model, valid_X)
 
-		topGeneCor[[ii]] = cor(valid_X[,595], valid_y)
+		topGeneCor[[i]] = abs(cor(valid_X[,top_gene], valid_y))
 
-		dataList[[ii]]  = data.frame("Pearson"=cor(predict_y, valid_y),"Lambda"=model$lambda, nSelected= model$df, loop=as.character(ii))
+		dataList[[i]]  = data.frame("Pearson"=cor(predict_y, valid_y),"Lambda"=model$lambda, nSelected= model$df, loop=as.character(i))
 
-		ii = ii + 1
 
 	}
+
+
+
+	library(ggplot2)
+	library(data.table)
+
+	toPlot = rbindlist(dataList)
+	lassonet_res <- fread(paste0("examples/full_batch_backtrack/",drug,"_lassonet_res.csv"))
+
+	lassonet_res_searchM <- fread(paste0("examples/full_batch_search_M/",drug,"_lassonet_res.csv"))
+
+
+	toPlotDrug[[drug]] <- toPlot
+	lassonetDrug[[drug]] <- lassonet_res
+	lassonetDrugSearchM[[drug]] <- lassonet_res_searchM
+
+
+	# pdf(paste0(drug,"_pearson_over_nselect_points.pdf"))
+	# p <- ggplot() + geom_point(data=toPlot, aes(nSelected, Pearson, col="glmnet")) + 
+	# geom_point(data=lassonet_res, aes(x=N_Selected, y=Pearson, col="Lassonet")) + theme_bw() +
+	# geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle(paste0("Results for ",drug," in 5FCV"))
+	# print(p)	
+	# dev.off()
+
+	# pdf(paste0(drug,"_pearson_over_lambda_points.pdf"))
+	# p <- ggplot() + geom_point(data=toPlot, aes(Lambda, Pearson, col="glmnet")) + scale_x_log10() + 
+	# geom_point(data=lassonet_res, aes(x=lambda, y=Pearson, col="Lassonet")) + theme_bw() +
+	# geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle(paste0("Results for ",drug," in 5FCV"))
+	# print(p)	
+	# dev.off()
+
+	# pdf(paste0(drug,"_pearson_over_nselect_smooth.pdf"))
+	# p <- ggplot() + geom_smooth(data=toPlot, aes(nSelected, Pearson, col="glmnet")) + 
+	# geom_smooth(data=lassonet_res, aes(x=N_Selected, y=Pearson, col="Lassonet")) + theme_bw() +
+	# geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle(paste0("Results for ",drug," in 5FCV"))
+	# print(p)	
+	# dev.off()
+
+	# pdf(paste0(drug,"_pearson_over_lambda_smooth.pdf"))
+	# p <- ggplot() + geom_smooth(data=toPlot, aes(Lambda, Pearson, col="glmnet")) + scale_x_log10() + 
+	# geom_smooth(data=lassonet_res, aes(x=lambda, y=Pearson, col="Lassonet")) + theme_bw() +
+	# geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle(paste0("Results for ",drug," in 5FCV"))
+	# print(p)
+	# dev.off()
+
+
+	# res.summary <- data.frame(lassonet=lassonet_res[,max(Pearson,na.rm=T), loop][,V1], glmnet=toPlot[,max(Pearson, na.rm=T), loop][,V1],
+	# 			"Top Gene"=topGeneCor)
+
+	# pdf(paste0(drug,"_res_summary.pdf"))
+	# boxplot(res.summary, main=drug, ylab="Best pearson correlation over path in validation")
+	# dev.off()
+
+
 
 }
 
 
+for(drug in names(lassonetDrug)){
+	lassonetDrug[[drug]][,Drug:=drug]
+}
 
-library(ggplot2)
-library(data.table)
+lassonetAllDrug <- rbindlist(lassonetDrug)
 
-toPlot = rbindlist(dataList)
-lassonet_res <- fread("examples/lapatinib_lassonet_res.csv")
+for(drug in names(lassonetDrugSearchM)){
+	lassonetDrugSearchM[[drug]][,Drug:=drug]
+}
+
+lassonetAllDrugSearchM <- rbindlist(lassonetDrugSearchM)
 
 
 
-pdf("lap_pearson_over_nselect_points.pdf")
-ggplot() + geom_point(data=toPlot, aes(nSelected, Pearson, col="glmnet")) + 
-geom_point(data=lassonet_res, aes(x=N_Selected, y=Pearson, col="Lassonet")) + theme_bw() +
-geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle("Results for Lapatinib in nested CV")
+for(drug in names(toPlotDrug)){
+	toPlotDrug[[drug]][,Drug:=drug]
+}
+
+toPlotAllDrug <- rbindlist(toPlotDrug)
+
+
+toPlotAllDrugBest <-  toPlotAllDrug[,max(Pearson,na.rm=T), .(loop,Drug)]
+
+lassonetAllDrugBest <-  lassonetAllDrug[,max(Pearson,na.rm=T), .(loop,Drug)]
+lassonetAllDrugBestSearchM <-  lassonetAllDrugSearchM[,max(Pearson,na.rm=T), .(loop,Drug)]
+
+
+
+toPlotAllDrugBest[,Method:="glmnet"]
+lassonetAllDrugBest[,Method:="lassonet"]
+lassonetAllDrugBestSearchM[,Method:="lassonet Search M"]
+
+
+toPlotTotal <- rbind(rbind(toPlotAllDrugBest,lassonetAllDrugBest), lassonetAllDrugBestSearchM)
+
+colnames(toPlotTotal)[3]<- "Pearson"
+
+toPlotTotal <- toPlotTotal[,.(Mean=mean(Pearson), upper=mean(Pearson)+ sd(Pearson), lower=mean(Pearson)-sd(Pearson)),.(Drug,Method)]
+
+pdf("full_batch_backtrack_lassonet_vs_glmnet_summary_searchM.pdf", height=6, width=9)
+ggplot(toPlotTotal, aes(Drug, Mean, fill=Method)) + 
+geom_col(position="dodge") +
+geom_errorbar(aes(ymin=lower, ymax=upper), width=.2,
+                 position=position_dodge(.9)) +
+theme_bw() + theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1)) + ylab("Mean Pearson")
 dev.off()
-
-pdf("lap_pearson_over_lambda_points.pdf")
-ggplot() + geom_point(data=toPlot, aes(Lambda, Pearson, col="glmnet")) + scale_x_log10() + 
-geom_point(data=lassonet_res, aes(x=lambda, y=Pearson, col="Lassonet")) + theme_bw() +
-geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle("Results for Lapatinib in nested CV")
-dev.off()
-
-pdf("lap_pearson_over_nselect_smooth.pdf")
-ggplot() + geom_smooth(data=toPlot, aes(nSelected, Pearson, col="glmnet")) + 
-geom_smooth(data=lassonet_res, aes(x=N_Selected, y=Pearson, col="Lassonet")) + theme_bw() +
-geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle("Results for Lapatinib in nested CV")
-dev.off()
-
-pdf("lap_pearson_over_lambda_smooth.pdf")
-ggplot() + geom_smooth(data=toPlot, aes(Lambda, Pearson, col="glmnet")) + scale_x_log10() + 
-geom_smooth(data=lassonet_res, aes(x=lambda, y=Pearson, col="Lassonet")) + theme_bw() +
-geom_hline(mapping=aes(col="Top Gene", yintercept= mean(topGeneCor))) + ggtitle("Results for Lapatinib in nested CV")
-dev.off()
+# 6/21 lassonet wins
 
 
-res.summary <- data.frame(lassonet=lassonet_res[,max(Pearson,na.rm=T), loop][,V1], glmnet=toPlot[,max(Pearson, na.rm=T), loop][,V1],
-			"Top Gene"=topGeneCor)
 
-pdf("lapatinib_res_summary.pdf")
-boxplot(res.summary)
-dev.off()
 
 

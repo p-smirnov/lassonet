@@ -32,7 +32,7 @@ drugNames= ["5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", 
 drugNames= ["5-Fluorouracil"]
 
 n_folds = 5
-run_prefix="full_batch_search_M"
+run_prefix="full_batch_grid_search_M"
 batch_size=None
 
 nHiddenUnits = [10,20,50,100,200,500]
@@ -136,27 +136,63 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 
 
 
+def gridSearchM(bestHyperpar, eps_start, n_iters,
+                   backtrack, verbose, lambda_seq, patience,
+                   batch_size, X, y, splitLists, M_grid=np.logspace(-1,3,10)):
+    cur_best_ave_val_loss = np.inf
+
+    for M in M_grid:
+
+        (new_model, new_path, new_best_list, new_best_ave_val_loss) = returnCVResults(bestHyperpar=bestHyperpar,
+                                                                                  eps_start=eps_start,
+                                                                                  n_iters=n_iters,
+                                                                                  backtrack=backtrack,
+                                                                                  verbose=verbose,
+                                                                                  lambda_seq=lambda_seq,
+                                                                                  patience=patience,
+                                                                                  batch_size=batch_size,
+                                                                                  X=X, y=y,
+                                                                                  M=M, splitLists=splitLists)
+
+        if(new_best_ave_val_loss<cur_best_ave_val_loss):
+            cur_best_ave_val_loss=new_best_ave_val_loss
+            cur_best_list = new_best_list
+            cur_M = M
+            cur_path = new_path
+            cur_model = new_model
+            print(f"Current M is {cur_M}")
+
+    return (cur_best_list, cur_M, cur_model, cur_path)
+
+
+def load_ctrp(drug):
+    gene_exp = pd.read_csv("data/ctrpv2.gene.exp.l1k.csv")
+    gene_exp = gene_exp.dropna(1)
+    gene_exp.index = gene_exp.iloc[:,0]
+    gene_exp = gene_exp.drop('Unnamed: 0', axis=1)
+    drug_resp = pd.read_csv("data/ctrpv2.aac.csv")
+    drug_resp.index = drug_resp.iloc[:,0]
+    drug_resp = drug_resp.drop('Unnamed: 0', axis=1)
+    drug_resp = drug_resp.loc[drug]
+    drug_resp = drug_resp.dropna(0)
+    unique_cells = gene_exp.columns.intersection(drug_resp.index)
+    drug_resp = drug_resp[unique_cells].to_numpy()
+    gene_exp = gene_exp[unique_cells].transpose().to_numpy()
+    return(gene_exp, drug_resp/100)
+
+def load_ctrp2(drug):
+    data = pd.read_csv("examples/L1000_gene_expression/gene_CCLE_rnaseq_" + drug + "_response.csv")
+    drug_resp = data.target
+    gene_exp = data.drop('cell_line', axis=1).drop('target', axis=1)
+    return(gene_exp, drug_resp)
+
+
+
+
 for drugName in drugNames:
 
     print(drugName)
-    def load_ctrp(drug=drugName):
-        gene_exp = pd.read_csv("ctrpv2.gene.exp.l1k.csv")
-        gene_exp = gene_exp.dropna(1)
-        gene_exp.index = gene_exp.iloc[:,0]
-        gene_exp = gene_exp.drop('Unnamed: 0', axis=1)
-        drug_resp = pd.read_csv("ctrpv2.aac.csv")
-        drug_resp.index = drug_resp.iloc[:,0]
-        drug_resp = drug_resp.drop('Unnamed: 0', axis=1)
-        drug_resp = drug_resp.loc[drug]
-        drug_resp = drug_resp.dropna(0)
-        unique_cells = gene_exp.columns.intersection(drug_resp.index)
-        drug_resp = drug_resp[unique_cells].to_numpy()
-        gene_exp = gene_exp[unique_cells].transpose().to_numpy()
-        return(gene_exp, drug_resp/100)
-
-
-
-    X, y = load_ctrp()
+    X, y = load_ctrp(drugName)
     kf_outer = KFold(n_folds, shuffle=True, random_state=42)
 
 
@@ -176,14 +212,13 @@ for drugName in drugNames:
     pickle.dump(forRGLMNET, open(run_prefix + "/" + "forR_"+drugName+".p", "wb"))
 
 
-    (best_res_over_l_list, best_M, best_model, pathList) = patternSearchM(bestHyperpar=bestHyperpar, eps_start=1,
+    (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                           n_iters=(5000,5000),
                                                                           backtrack=True, verbose=False,
                                                                           lambda_seq=np.logspace(-2,2,2000),
                                                                           patience=(100,100),
                                                                           batch_size=batch_size, X=X, y=y,
-                                                                          splitLists=splitLists,
-                                                                          M_start=10, min_step=0.1, start_step=5)
+                                                                          splitLists=splitLists)
 
 
     print(best_M)

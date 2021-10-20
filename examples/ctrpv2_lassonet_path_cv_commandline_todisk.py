@@ -142,8 +142,8 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
     return (cur_best_list, cur_M, cur_model, cur_path)
 
 
-def dumpCurrentModel(modelTuple):
-    pickle.dump(modelTuple, open(run_prefix + "/" + "best_model_"+drugName+".p", "wb"))
+def dumpCurrentModel(arg1, arg2, arg3, arg4):
+    pickle.dump((arg1,arg2,arg3,arg4), open(run_prefix + "/" + "best_model_"+drugName+".p", "wb"))
 
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
@@ -199,7 +199,7 @@ def gridSearchMSaveDisk(bestHyperpar, eps_start, n_iters,
             else:
                 p.join()
                 p.close()
-            p = Process(target=dumpCurrentModel, args=tuple([new_model, new_path, new_best_list, new_best_ave_val_loss]))
+            p = Process(target=dumpCurrentModel, args=(new_best_list, M, new_model, new_path))
             p.start()
             cur_best_ave_val_loss=new_best_ave_val_loss
             cur_M = M

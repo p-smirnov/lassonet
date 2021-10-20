@@ -194,17 +194,16 @@ def gridSearchMSaveDisk(bestHyperpar, eps_start, n_iters,
 
 
         if(new_best_ave_val_loss<cur_best_ave_val_loss):
-            p.join()
-            p.close()
+            if firstLoop: 
+                firstLoop=False
+            else:
+                p.join()
+                p.close()
             p = Process(target=dumpCurrentModel, args=((new_model, new_path, new_best_list, new_best_ave_val_loss)))
             p.start()
             cur_best_ave_val_loss=new_best_ave_val_loss
             cur_M = M
             print(f"Current M is {cur_M}")
-        if firstLoop:
-            p = Process(target=dumpCurrentModel, args=((new_model, new_path, new_best_list, new_best_ave_val_loss)))
-            p.start()
-            firstLoop = False
         del new_path
         gc.collect()
     p.join()
@@ -259,7 +258,7 @@ forRGLMNET = [X, y, splitLists]
 pickle.dump(forRGLMNET, open(run_prefix + "/" + "forR_"+drugName+".p", "wb"))
 
 
-(best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
+(best_res_over_l_list, best_M, best_model, pathList) = gridSearchMSaveDisk(bestHyperpar=bestHyperpar, eps_start=1,
                                                                       n_iters=(5000,5000),
                                                                       backtrack=True, verbose=False,
                                                                       lambda_seq=np.logspace(-2,2,2000),

@@ -199,7 +199,7 @@ def gridSearchMSaveDisk(bestHyperpar, eps_start, n_iters,
             else:
                 p.join()
                 p.close()
-            p = Process(target=dumpCurrentModel, args=((new_model, new_path, new_best_list, new_best_ave_val_loss)))
+            p = Process(target=dumpCurrentModel, args=tuple([new_model, new_path, new_best_list, new_best_ave_val_loss]))
             p.start()
             cur_best_ave_val_loss=new_best_ave_val_loss
             cur_M = M

@@ -35,7 +35,52 @@ X_train, X_test, y_train, y_test = train_test_split(X, y)
 model = LassoNetClassifier(verbose=True, backtrack=True, batch_size=64)
 path = model.path(X_train, y_train, X_val=X_test, y_val=y_test)
 
-
+model = LassoNetClassifier(dropout=0.5)
+path = model.path(X_train, y_train)
 plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_dropout.png")
 
-plt.savefig("miceprotein_backtrack_minibatches.png")
+model = LassoNetClassifier(hidden_dims=(100, 100))
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep.png")
+
+model = LassoNetClassifier(hidden_dims=(100, 100), gamma=0.01)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep_l2_weak.png")
+
+model = LassoNetClassifier(hidden_dims=(100, 100), gamma=0.1)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep_l2_strong.png")
+
+model = LassoNetClassifier(hidden_dims=(100, 100), gamma=1)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep_l2_super_strong.png")
+
+model = LassoNetClassifier(hidden_dims=(100, 100), dropout=0.5)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep_dropout.png")
+
+model = LassoNetClassifier(hidden_dims=(100, 100), backtrack=True, dropout=0.5)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_deep_dropout_backtrack.png")
+
+model = LassoNetClassifier(batch_size=64)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_64.png")
+
+model = LassoNetClassifier(backtrack=True)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_backtrack.png")
+
+model = LassoNetClassifier(batch_size=64, backtrack=True)
+path = model.path(X_train, y_train)
+plot_path(model, path, X_test, y_test)
+plt.savefig("miceprotein_backtrack_64.png")

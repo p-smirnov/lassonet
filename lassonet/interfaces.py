@@ -34,6 +34,7 @@ class HistoryItem:
     val_objective: float  # val_loss + lambda_ * regulatization
     val_loss: float
     regularization: float
+    l2_regularization: float
     selected: torch.BoolTensor
     n_iters: int
     validation_metrics: tuple
@@ -47,8 +48,10 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         eps_start=1,
         lambda_start=None,
         lambda_seq=None,
+        gamma=0.0,
         path_multiplier=1.02,
         M=10,
+        dropout=0,
         batch_size=None,
         optim=None,
         n_iters=(1000, 100),
@@ -72,16 +75,19 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             loss of the unconstrained model multiplied by eps_start.
         lambda_start : float, default=None
             First value on the path.
-        path_multiplier : float
-            Multiplicative factor (:math:`1 + \\epsilon`) to increase
-            the penalty parameter over the path
         lambda_seq : iterable of float
             If specified, the model will be trained on this sequence
             of values, until all coefficients are zero.
             The dense model will always be trained first.
             Note: lambda_start and path_multiplier will be ignored.
+        gamma : float, default=0.0
+            l2 penalization
+        path_multiplier : float
+            Multiplicative factor (:math:`1 + \\epsilon`) to increase
+            the penalty parameter over the path
         M : float, default=10.0
             Hierarchy parameter.
+        dropout : float, default = None
         batch_size : int, default=None
             If None, does not use batches. Batches are shuffled at each epoch.
         optim : torch optimizer or tuple of 2 optimizers, default=None
@@ -105,7 +111,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             Default: GPU if available else CPU
         verbose : int, default=0
         random_state
-            Random state for cross-validation
+            Random state for validation
         torch_seed
             Torch state for model random initialization
         """
@@ -114,8 +120,10 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         self.eps_start = eps_start
         self.lambda_start = lambda_start
         self.lambda_seq = lambda_seq
+        self.gamma = gamma
         self.path_multiplier = path_multiplier
         self.M = M
+        self.dropout = dropout
         self.batch_size = batch_size
         self.optim = optim
         self.lr = lr
@@ -124,13 +132,13 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 partial(torch.optim.Adam, lr=lr),
                 partial(torch.optim.SGD, lr=lr, momentum=0.9),
             )
-        if isinstance(optim, torch.optim.Optimizer):
+        if isinstance(optim, partial):
             optim = (optim, optim)
         self.optim_init, self.optim_path = optim
         if isinstance(n_iters, int):
             n_iters = (n_iters, n_iters)
         self.n_iters = self.n_iters_init, self.n_iters_path = n_iters
-        if isinstance(patience, int):
+        if patience is None or isinstance(patience, int):
             patience = (patience, patience)
         self.patience = self.patience_init, self.patience_path = patience
         self.tol = tol
@@ -167,9 +175,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         if self.torch_seed is not None:
             torch.manual_seed(self.torch_seed)
         self.model = LassoNet(
-            X.shape[1],
-            *self.hidden_dims,
-            output_shape,
+            X.shape[1], *self.hidden_dims, output_shape, dropout=self.dropout
         ).to(self.device)
 
     def _cast_input(self, X, y=None):
@@ -212,6 +218,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 return (
                     self.criterion(model(X_val), y_val).item()
                     + lambda_ * model.regularization().item()
+                    + self.gamma * model.l2_regularization().item()
                 )
 
         best_val_obj = validation_obj()
@@ -242,7 +249,10 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
                 def closure():
                     nonlocal loss
                     optimizer.zero_grad()
-                    ans = self.criterion(model(X_train[batch]), y_train[batch])
+                    ans = (
+                        self.criterion(model(X_train[batch]), y_train[batch])
+                        + self.gamma * model.l2_regularization()
+                    )
                     ans.backward()
                     loss += ans.item() * len(batch) / n_train
                     return ans
@@ -276,6 +286,8 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             loss = real_loss
         else:
             n_iters = epoch + 1
+        with torch.no_grad():
+            l2_regularization = self.model.l2_regularization()
         reg = self.model.regularization().item()
         return HistoryItem(
             lambda_=lambda_,
@@ -285,6 +297,7 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             val_objective=val_obj,
             val_loss=val_obj - lambda_ * reg,
             regularization=reg,
+            l2_regularization=l2_regularization,
             selected=self.model.input_mask(),
             n_iters=n_iters,
             validation_metrics=self.validation_metrics(X_val, y_val)
@@ -298,13 +311,12 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
     def _lambda_max(X, y):
         raise NotImplementedError
 
-    def path(self, X, y, *, X_val=None, y_val=None, lambda_=None) -> List[HistoryItem]:
+    def path(self, X, y, *, X_val=None, y_val=None) -> List[HistoryItem]:
         """Train LassoNet on a lambda_ path.
         The path is defined by the class parameters:
         start at `eps * lambda_max` and increment according
         to `path_multiplier` or `n_lambdas`.
         The path will stop when no feature is being used anymore.
-
 
         'X_val' and 'y_val' are optional parameters allowing a
         validation set to be passed in. If omitted, a validation
@@ -314,12 +326,13 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         The optional `lambda_` argument will also stop the path when
         this value is reached.
         """
-        assert (sample_val := X_val is None) == (
+        assert (X_val is None) == (
             y_val is None
         ), "You must specify both or none of X_val and y_val"
+        sample_val = X_val is None
         if sample_val:
             X_train, X_val, y_train, y_val = train_test_split(
-                X, y, test_size=self.val_size
+                X, y, test_size=self.val_size, random_state=self.random_state
             )
         else:
             X_train, y_train = X, y
@@ -447,15 +460,16 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
         return best_perf
 
     def load(self, state_dict):
+        if isinstance(state_dict, HistoryItem):
+            state_dict = state_dict.state_dict
         if self.model is None:
             output_shape, input_shape = state_dict["skip.weight"].shape
             self.model = LassoNet(
-                input_shape,
-                *self.hidden_dims,
-                output_shape,
+                input_shape, *self.hidden_dims, output_shape, dropout=self.dropout
             ).to(self.device)
 
         self.model.load_state_dict(state_dict)
+        return self
 
 
 class LassoNetRegressor(

@@ -5,7 +5,7 @@ source_python("pickleHelper.py")
 
 
 drugNames=c("5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", "Dabrafenib", "Dasatinib", "Docetaxel", "Erlotinib", "Gefitinib", "Gemcitabine", "Ibrutinib", "JQ1 compound", "Lapatinib", "MK-2206", "Nilotinib", "Paclitaxel", "Pictilisib", "PLX4720", "Vincristine", "Vorinostat")
-drugNames=c("5-Fluorouracil", "Lapatinib")
+drugNames=c("5-Fluorouracil", "AZD7762", "AZD8055", "Crizotinib", "Dabrafenib", "Docetaxel", "Erlotinib",  "Lapatinib" )
 
 
 
@@ -62,7 +62,7 @@ for(drug in drugNames){
 	toPlot = rbindlist(dataList)
 	lassonet_res <- fread(paste0("examples/full_batch_backtrack/",drug,"_lassonet_res.csv"))
 
-	lassonet_res_searchM <- fread(paste0("examples/full_batch_search_M/",drug,"_lassonet_res.csv"))
+	lassonet_res_searchM <- fread(paste0("examples/full_batch_grid_search_M/",drug,"_lassonet_res.csv"))
 
 
 	toPlotDrug[[drug]] <- toPlot
@@ -151,7 +151,7 @@ colnames(toPlotTotal)[3]<- "Pearson"
 toPlotTotal <- toPlotTotal[,.(Mean=mean(Pearson), upper=mean(Pearson)+ sd(Pearson), lower=mean(Pearson)-sd(Pearson)),.(Drug,Method)]
 
 pdf("full_batch_backtrack_lassonet_vs_glmnet_summary_searchM.pdf", height=6, width=9)
-ggplot(toPlotTotal, aes(Drug, Mean, fill=Method)) + 
+ggplot(toPlotTotal[,Method!="lassonet"], aes(Drug, Mean, fill=Method)) + 
 geom_col(position="dodge") +
 geom_errorbar(aes(ymin=lower, ymax=upper), width=.2,
                  position=position_dodge(.9)) +

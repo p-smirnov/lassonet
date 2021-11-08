@@ -32,7 +32,7 @@ drugNames= ["5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", 
 drugNames= ["Lapatinib"]
 
 n_folds = 5
-run_prefix="full_batch_grid_search_M"
+run_prefix="full_batch_grid_search_M_one_layer"
 batch_size=None
 
 nHiddenUnits = [10,20,50,100,200,500]
@@ -196,12 +196,12 @@ for drugName in drugNames:
     kf_outer = KFold(n_folds, shuffle=True, random_state=42)
 
 
-    FullModelResDict = pickle.load(open(run_prefix + "/fullModelHyperparameters_"+drugName+".p", "rb"))
+    # FullModelResDict = pickle.load(open(run_prefix + "/fullModelHyperparameters_"+drugName+".p", "rb"))
 
-    hyperparResTable = np.array([[np.mean(x) for x in y] for items,y in list(FullModelResDict.items())])
-    bestHyperparIndex = np.argmin(np.mean(hyperparResTable, 1))
-    bestHyperpar = list(FullModelResDict.keys())[bestHyperparIndex]
-
+    # hyperparResTable = np.array([[np.mean(x) for x in y] for items,y in list(FullModelResDict.items())])
+    # bestHyperparIndex = np.argmin(np.mean(hyperparResTable, 1))
+    # bestHyperpar = list(FullModelResDict.keys())[bestHyperparIndex]
+    bestHyperpar = [(200,), 0.001]
 
 
     splitLists = []
@@ -215,7 +215,7 @@ for drugName in drugNames:
     (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                           n_iters=(5000,5000),
                                                                           backtrack=True, verbose=False,
-                                                                          lambda_seq=np.logspace(-2,2,2000),
+                                                                          lambda_seq=np.logspace(-0.5,2,1200),
                                                                           patience=(100,100),
                                                                           batch_size=batch_size, X=X, y=y,
                                                                           splitLists=splitLists)

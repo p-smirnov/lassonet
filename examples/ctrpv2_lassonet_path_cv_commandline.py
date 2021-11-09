@@ -13,6 +13,10 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import ParameterGrid
 from multiprocessing import Process, Manager, Queue
 import datetime
+from memory_profiler import profile
+
+
+
 manager = Manager()
 
 import pickle
@@ -40,7 +44,7 @@ print(datetime.datetime.now())
 ## Define some optimization paramaters
 
 n_folds = 5
-run_prefix=scratchPath + "/full_batch_grid_search_M"
+run_prefix=scratchPath + "3_layer_dropout_50"
 batch_size=None
 
 nHiddenUnits = [10,20,50,100,200,500]
@@ -54,7 +58,7 @@ parGrid = [(hiddenDims, lr) for hiddenDims, lr in parGrid if not (type(hiddenDim
 
 def returnCVResults(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
-                   batch_size, X, y, M, splitLists):
+                   batch_size, X, y, M, splitLists, dropout=0.5):
     pathList = []
     best_list = []
 
@@ -72,7 +76,7 @@ def returnCVResults(bestHyperpar, eps_start, n_iters,
         valid_X = scalerX.transform(valid_X)
         model = LassoNetRegressor(eps_start=eps_start, n_iters=n_iters, hidden_dims=hiddenDims,
                               backtrack=backtrack, verbose=verbose, lr=lr, lambda_seq=lambda_seq, patience=patience,
-                              batch_size=batch_size, M=M)
+                              batch_size=batch_size, M=M, dropout=dropout)
         path = model.path(train_X, train_y.reshape(-1), X_val=valid_X, y_val=valid_y.reshape(-1))
         best_tuple = model._return_best_performance(path)
         pathList.append(path)
@@ -143,7 +147,7 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 
 
 
-
+@profile
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
                    batch_size, X, y, splitLists, M_grid=np.logspace(-1,3,10)):

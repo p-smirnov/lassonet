@@ -10,6 +10,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import ParameterGrid
 from multiprocessing import Process, Manager, Queue
 import datetime
+from memory_profiler import profile
 manager = Manager()
 
 import pickle
@@ -32,7 +33,7 @@ drugNames= ["5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", 
 drugNames= ["Lapatinib"]
 
 n_folds = 5
-run_prefix="full_batch_grid_search_M"
+run_prefix="3_layer_dropout_50"
 batch_size=None
 
 nHiddenUnits = [10,20,50,100,200,500]
@@ -46,7 +47,7 @@ parGrid = [(hiddenDims, lr) for hiddenDims, lr in parGrid if not (type(hiddenDim
 
 def returnCVResults(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
-                   batch_size, X, y, M, splitLists):
+                   batch_size, X, y, M, splitLists, dropout=0.5):
     pathList = []
     best_list = []
 
@@ -64,7 +65,7 @@ def returnCVResults(bestHyperpar, eps_start, n_iters,
         valid_X = scalerX.transform(valid_X)
         model = LassoNetRegressor(eps_start=eps_start, n_iters=n_iters, hidden_dims=hiddenDims,
                               backtrack=backtrack, verbose=verbose, lr=lr, lambda_seq=lambda_seq, patience=patience,
-                              batch_size=batch_size, M=M)
+                              batch_size=batch_size, M=M, dropout=dropout)
         path = model.path(train_X, train_y.reshape(-1), X_val=valid_X, y_val=valid_y.reshape(-1))
         best_tuple = model._return_best_performance(path)
         pathList.append(path)
@@ -135,10 +136,10 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 
 
 
-
+@profile
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
-                   batch_size, X, y, splitLists, M_grid=np.logspace(-1,3,10)):
+                   batch_size, X, y, splitLists, M_grid=np.logspace(-1,5,10)):
     cur_best_ave_val_loss = np.inf
 
     for M in M_grid:
@@ -153,7 +154,6 @@ def gridSearchM(bestHyperpar, eps_start, n_iters,
                                                                                   batch_size=batch_size,
                                                                                   X=X, y=y,
                                                                                   M=M, splitLists=splitLists)
-
         if(new_best_ave_val_loss<cur_best_ave_val_loss):
             cur_best_ave_val_loss=new_best_ave_val_loss
             cur_best_list = new_best_list
@@ -161,6 +161,8 @@ def gridSearchM(bestHyperpar, eps_start, n_iters,
             cur_path = new_path
             cur_model = new_model
             print(f"Current M is {cur_M}")
+        # del new_path
+
 
     return (cur_best_list, cur_M, cur_model, cur_path)
 
@@ -215,7 +217,7 @@ for drugName in drugNames:
     (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                           n_iters=(5000,5000),
                                                                           backtrack=True, verbose=False,
-                                                                          lambda_seq=np.logspace(-2,2,2000),
+                                                                          lambda_seq=np.logspace(-0.5,2,1500),
                                                                           patience=(100,100),
                                                                           batch_size=batch_size, X=X, y=y,
                                                                           splitLists=splitLists)

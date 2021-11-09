@@ -40,6 +40,7 @@ class HistoryItem:
     validation_metrics: tuple
 
 
+
 class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
     def __init__(
         self,

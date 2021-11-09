@@ -26,10 +26,12 @@ from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 from sklearn.model_selection import KFold
 from multiprocessing import Process, Manager, Queue
-# import yappi
+import os
 
 drugNames= ["5-Fluorouracil", "AZD7762", "AZD8055", "Bortezomib", "Crizotinib", "Dabrafenib", "Dasatinib", "Docetaxel", "Erlotinib", "Gefitinib", "Gemcitabine", "Ibrutinib", "JQ1 compound", "Lapatinib", "MK-2206", "Nilotinib", "Paclitaxel", "Pictilisib", "PLX4720", "Vincristine", "Vorinostat"]
-drugNames= ["MK-2206", "Nilotinib", "Paclitaxel", "Pictilisib", "PLX4720", "Vincristine", "Vorinostat"]
+drugNames= ["Lapatinib"]
+
+print(os.getcwd())
 
 manager = Manager()
 
@@ -45,6 +47,7 @@ import torch
 import pandas as pd
 
 ## Define some optimization paramaters
+run_prefix="3_layer_dropout_50"
 
 n_folds = 5
 
@@ -106,7 +109,7 @@ for drugName in drugNames:
             lr = pars[1]
             # print(torch.cuda.is_available())
             model = LassoNetRegressor(eps_start=1e-2, lambda_start=1, n_iters=(5000, 1000), hidden_dims=hiddenDims,
-                                      path_multiplier=1.005, lr=lr, lambda_seq=[], verbose=False, batch_size=64)
+                                      path_multiplier=1.005,dropout=0.5, lr=lr, lambda_seq=[], verbose=False, batch_size=64)
             valid_performance = []
             for train_index, valid_index in splitLists:
                 train_X, train_y = X[train_index,], y[train_index]
@@ -147,7 +150,7 @@ for drugName in drugNames:
     resDict = FullModelResDict._getvalue()
     t1 = time.time()
 
-    pickle.dump(resDict, open("fullModelHyperparameters_"+drugName+".p", "wb"))
+    pickle.dump(resDict, open(run_prefix + "/fullModelHyperparameters_"+drugName+".p", "wb"))
     print(t1 - t0)
     time.sleep(10)
 

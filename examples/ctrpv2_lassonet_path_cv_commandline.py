@@ -44,7 +44,7 @@ print(datetime.datetime.now())
 ## Define some optimization paramaters
 
 n_folds = 5
-run_prefix=scratchPath + "3_layer_dropout_50"
+run_prefix=scratchPath + "/3_layer_dropout_50"
 batch_size=None
 
 nHiddenUnits = [10,20,50,100,200,500]
@@ -150,7 +150,7 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 @profile
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
-                   batch_size, X, y, splitLists, M_grid=np.logspace(-1,3,10)):
+                   batch_size, X, y, splitLists, M_grid=np.logspace(-1,5,10)):
     cur_best_ave_val_loss = np.inf
 
     for M in M_grid:
@@ -226,7 +226,7 @@ pickle.dump(forRGLMNET, open(run_prefix + "/" + "forR_"+drugName+".p", "wb"))
 (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                       n_iters=(5000,5000),
                                                                       backtrack=True, verbose=False,
-                                                                      lambda_seq=np.logspace(-2,2,2000),
+                                                                      lambda_seq=np.logspace(1,4,1500),
                                                                       patience=(100,100),
                                                                       batch_size=batch_size, X=X, y=y,
                                                                       splitLists=splitLists)

@@ -11,6 +11,7 @@ from sklearn.model_selection import ParameterGrid
 from multiprocessing import Process, Manager, Queue
 import datetime
 from memory_profiler import profile
+import time
 manager = Manager()
 
 import pickle
@@ -66,7 +67,10 @@ def returnCVResults(bestHyperpar, eps_start, n_iters,
         model = LassoNetRegressor(eps_start=eps_start, n_iters=n_iters, hidden_dims=hiddenDims,
                               backtrack=backtrack, verbose=verbose, lr=lr, lambda_seq=lambda_seq, patience=patience,
                               batch_size=batch_size, M=M, dropout=dropout)
+        start = time.time()
         path = model.path(train_X, train_y.reshape(-1), X_val=valid_X, y_val=valid_y.reshape(-1))
+        end = time.time()
+        print(end - start)
         best_tuple = model._return_best_performance(path)
         pathList.append(path)
         best_list.append(best_tuple)
@@ -136,7 +140,7 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 
 
 
-@profile
+# @profile
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
                    batch_size, X, y, splitLists, M_grid=np.logspace(-1,5,10)):
@@ -217,7 +221,7 @@ for drugName in drugNames:
     (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                           n_iters=(5000,5000),
                                                                           backtrack=True, verbose=False,
-                                                                          lambda_seq=np.logspace(-0.5,2,1500),
+                                                                          lambda_seq=np.logspace(-0.5,2,600), ##
                                                                           patience=(100,100),
                                                                           batch_size=batch_size, X=X, y=y,
                                                                           splitLists=splitLists)

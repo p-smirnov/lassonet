@@ -147,7 +147,7 @@ def patternSearchM(bestHyperpar, eps_start, n_iters,
 
 
 
-@profile
+# @profile
 def gridSearchM(bestHyperpar, eps_start, n_iters,
                    backtrack, verbose, lambda_seq, patience,
                    batch_size, X, y, splitLists, M_grid=np.logspace(-1,5,10)):
@@ -226,7 +226,7 @@ pickle.dump(forRGLMNET, open(run_prefix + "/" + "forR_"+drugName+".p", "wb"))
 (best_res_over_l_list, best_M, best_model, pathList) = gridSearchM(bestHyperpar=bestHyperpar, eps_start=1,
                                                                       n_iters=(5000,5000),
                                                                       backtrack=True, verbose=False,
-                                                                      lambda_seq=np.logspace(1,4,1500),
+                                                                      lambda_seq=np.logspace(1,4,700),
                                                                       patience=(100,100),
                                                                       batch_size=batch_size, X=X, y=y,
                                                                       splitLists=splitLists)

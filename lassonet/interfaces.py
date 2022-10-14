@@ -5,6 +5,7 @@ from functools import partial
 from typing import List
 import warnings
 
+
 import numpy as np
 from sklearn.base import (
     BaseEstimator,
@@ -37,6 +38,7 @@ class HistoryItem:
     l2_regularization_skip: float
     selected: torch.BoolTensor
     n_iters: int
+    val_cor: float
 
     def log(item):
         print(
@@ -341,10 +343,15 @@ class BaseLassoNet(BaseEstimator, metaclass=ABCMeta):
             l2_regularization_skip=l2_regularization_skip,
             selected=self.model.input_mask().cpu(),
             n_iters=n_iters,
+            val_cor=self.metrics(model(X_val), y_val)
         )
 
     @abstractmethod
     def predict(self, X):
+        raise NotImplementedError
+
+    @abstractmethod
+    def metrics(self, y_pred, y):
         raise NotImplementedError
 
     def path(
@@ -539,6 +546,9 @@ class LassoNetRegressor(
         if isinstance(X, np.ndarray):
             ans = ans.cpu().numpy()
         return ans
+
+    def metrics(self, y_pred, y):
+        return torch.corrcoef(torch.stack([y_pred.reshape(-1), y.reshape(-1)]))[0,1].item()
 
 
 class LassoNetClassifier(

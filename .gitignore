@@ -11,3 +11,6 @@ build/
 *.png
 *.jpg
 *.csv
+venv
+wandb
+.idea
